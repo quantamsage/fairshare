@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}My Bills{% endblock %}
+{% block title %}My bills{% endblock %}
 {% block content %}
 
 <div class="page-header">
-  <h1>My Bills</h1>
-  <a href="/bill/new" class="btn btn-primary">+ New Bill</a>
+  <h1>My bills</h1>
+  <a href="{{ url_for('new_bill') }}" class="btn btn-primary">+ New bill</a>
 </div>
 
 {% if bills %}
@@ -12,14 +12,14 @@
     {% for b in bills %}
     <div class="bill-card">
       <div class="bill-card-body">
-        <h3><a href="/bill/{{ b[0] }}">{{ b[1] }}</a></h3>
-        <span class="currency-badge">{{ b[2] }}</span>
-        <p class="bill-date">{{ b[3][:10] }}</p>
+        <h3><a href="{{ url_for('bill', bill_id=b.id) }}">{{ b.name }}</a></h3>
+        <p class="bill-total">{{ b.currency }} {{ b.total|money }}</p>
+        <p class="bill-date">{{ b.people }} {{ "person" if b.people == 1 else "people" }} · {{ b.created.strftime("%d %b %Y") }}</p>
       </div>
       <div class="bill-card-actions">
-        <a href="/bill/{{ b[0] }}" class="btn btn-sm btn-primary">Open</a>
-        <form action="/bill/{{ b[0] }}/delete" method="post" style="display:inline"
-              onsubmit="return confirm('Delete this bill and all its payments?')">
+        <a href="{{ url_for('bill', bill_id=b.id) }}" class="btn btn-sm btn-primary">Open</a>
+        <form action="{{ url_for('delete_bill', bill_id=b.id) }}" method="post" class="inline"
+              onsubmit="return confirm('Delete this bill and everything in it?')">
           <button class="btn btn-sm btn-danger">Delete</button>
         </form>
       </div>
@@ -28,8 +28,8 @@
   </div>
 {% else %}
   <div class="empty-state">
-    <p>No bills yet. Create your first one!</p>
-    <a href="/bill/new" class="btn btn-primary">+ New Bill</a>
+    <p>No bills yet. Create one for your next trip, dinner or shared house.</p>
+    <a href="{{ url_for('new_bill') }}" class="btn btn-primary">+ New bill</a>
   </div>
 {% endif %}
 
