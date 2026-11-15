@@ -1,75 +1,160 @@
 {% extends "base.html" %}
 {% block title %}{{ bill.name }}{% endblock %}
 {% block content %}
+{% set cur = bill.currency %}
 
 <div class="page-header">
   <div>
     <h1>{{ bill.name }}</h1>
-    <span class="currency-badge">{{ bill.currency }}</span>
+    <span class="currency-badge">{{ cur }}</span>
+    {% if is_settled %}<span class="settled-badge">Settled</span>{% endif %}
   </div>
-  <div style="display:flex;gap:8px;">
-    <a href="/bill/{{ bill.id }}/export" class="btn btn-sm btn-outline">⬇ Export CSV</a>
-    <a href="/api/bill/{{ bill.id }}" target="_blank" class="btn btn-sm btn-outline">{ } API</a>
-    <a href="/" class="btn btn-sm btn-outline">← All Bills</a>
+  <div class="header-actions">
+    <a href="{{ url_for('export_csv', bill_id=bill.id) }}" class="btn btn-sm btn-outline">Export CSV</a>
+    <a href="{{ url_for('api_bill', bill_id=bill.id) }}" target="_blank" class="btn btn-sm btn-outline">JSON</a>
+    <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline">← All bills</a>
   </div>
 </div>
 
-<!-- Add Payment -->
+{% if weight_error %}<div class="flash flash-error" role="alert">{{ weight_error }} Change someone's share below.</div>{% endif %}
+
 <div class="card">
-  <h3>Add Payment</h3>
-  <form action="/bill/{{ bill.id }}/add" method="post" class="inline-form">
-    <input type="text" name="name" placeholder="Person's name" required>
-    <input type="number" name="amount" placeholder="Amount ({{ bill.currency }})" min="0.01" step="0.01" required>
-    <button type="submit" class="btn btn-primary">Add</button>
+  <h2>Add a payment</h2>
+  <form action="{{ url_for('add_payment', bill_id=bill.id) }}" method="post" class="inline-form">
+    <input type="text" name="name" aria-label="Paid by" placeholder="Paid by" list="people-list" maxlength="60" required>
+    <input type="number" name="amount" aria-label="Amount" placeholder="Amount ({{ cur }})" min="0.01" step="0.01" required>
+    <input type="text" name="description" aria-label="What for" placeholder="What for (optional)" maxlength="120">
+    <button type="submit" class="btn btn-primary">Add payment</button>
+  </form>
+  <datalist id="people-list">
+    {% for p in people %}<option value="{{ p.name }}">{% endfor %}
+  </datalist>
+</div>
+
+<div class="card">
+  <h2>People and shares</h2>
+  <p class="hint">
+    Everyone pays in proportion to their share. 1 is a normal share, 0.5 is half (say, they skipped the drinks),
+    2 is double, and 0 means they don't pay anything. Add people who didn't pay for anything too.
+  </p>
+  {% if people %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Person</th><th>Share</th><th class="num">Paid</th><th class="num">Fair share</th><th class="num">Balance</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for p in people %}
+        <tr>
+          <td>{{ p.name }}</td>
+          <td>
+            <form action="{{ url_for('update_person', bill_id=bill.id, person_id=p.id) }}" method="post" class="weight-form">
+              <input type="number" name="weight" value="{{ p.weight }}" min="0" max="100" step="0.01"
+                     aria-label="Share for {{ p.name }}">
+              <button type="submit" class="btn btn-sm btn-outline">Save</button>
+            </form>
+          </td>
+          <td class="num">{{ p.paid|money }}</td>
+          <td class="num">{{ p.share|money }}</td>
+          <td class="num {{ 'pos' if p.balance > 0 else 'neg' if p.balance < 0 else '' }}">
+            {% if p.balance > 0 %}gets back {{ p.balance|money }}
+            {% elif p.balance < 0 %}owes {{ (-p.balance)|money }}
+            {% else %}even{% endif %}
+          </td>
+          <td>
+            {% if not p.has_activity %}
+            <form action="{{ url_for('delete_person', bill_id=bill.id, person_id=p.id) }}" method="post" class="inline">
+              <button class="btn btn-sm btn-link">Remove</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  <form action="{{ url_for('add_person', bill_id=bill.id) }}" method="post" class="inline-form add-person">
+    <input type="text" name="name" aria-label="New person's name" placeholder="Add someone who didn't pay" maxlength="60" required>
+    <input type="number" name="weight" aria-label="New person's share" value="1" min="0" max="100" step="0.01" class="narrow">
+    <button type="submit" class="btn btn-outline">Add person</button>
   </form>
 </div>
 
-{% if payments %}
+{% if total > 0 %}
+<div class="card">
+  <h2>Settle up</h2>
+  {% if is_settled %}
+    <p class="empty">Everyone is square. Nothing left to pay.</p>
+  {% elif transfers %}
+    <ul class="settlement-list">
+      {% for t in transfers %}
+      <li>
+        <span><strong>{{ t.from }}</strong> pays <strong>{{ t.to }}</strong> {{ cur }} {{ t.amount|money }}</span>
+        <form action="{{ url_for('mark_paid', bill_id=bill.id) }}" method="post" class="inline">
+          <input type="hidden" name="from_id" value="{{ t.from_id }}">
+          <input type="hidden" name="to_id" value="{{ t.to_id }}">
+          <input type="hidden" name="amount" value="{{ t.amount }}">
+          <button type="submit" class="btn btn-sm btn-primary">Mark paid</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
 
-  <!-- Summary -->
-  <div class="card">
-    <h2>Overview</h2>
-    <div class="summary-grid">
-      <div class="summary-item">
-        <span class="summary-label">Total</span>
-        <span class="summary-value">{{ bill.currency }} {{ "%.2f"|format(total) }}</span>
+  {% if settled %}
+    <h3>Already paid</h3>
+    <ul class="settlement-list done">
+      {% for s in settled %}
+      <li>
+        <span>{{ s.from_name }} paid {{ s.to_name }} {{ cur }} {{ s.cents|money }} <span class="hint">· {{ s.paid_at.strftime("%d %b") }}</span></span>
+        <form action="{{ url_for('undo_paid', bill_id=bill.id, settlement_id=s.id) }}" method="post" class="inline">
+          <button type="submit" class="btn btn-sm btn-link">Undo</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="summary-grid">
+    <div class="summary-item"><span class="summary-label">Total spent</span><span class="summary-value">{{ cur }} {{ total|money }}</span></div>
+    <div class="summary-item"><span class="summary-label">People</span><span class="summary-value">{{ people|length }}</span></div>
+    <div class="summary-item"><span class="summary-label">Payments</span><span class="summary-value">{{ payments|length }}</span></div>
+  </div>
+  <h3>Paid vs fair share</h3>
+  <div class="bars">
+    {% for p in people %}
+    <div class="bar-row">
+      <span class="bar-name">{{ p.name }}</span>
+      <div class="bar-track">
+        <div class="bar paid" style="width: {{ (p.paid / max_bar * 100)|round(1) }}%"></div>
+        <div class="bar share" style="width: {{ (p.share / max_bar * 100)|round(1) }}%"></div>
       </div>
-      <div class="summary-item">
-        <span class="summary-label">People</span>
-        <span class="summary-value">{{ payments|length }}</span>
-      </div>
-      <div class="summary-item">
-        <span class="summary-label">Each pays</span>
-        <span class="summary-value">{{ bill.currency }} {{ "%.2f"|format(share) }}</span>
-      </div>
+      <span class="bar-values">{{ p.paid|money }} / {{ p.share|money }}</span>
     </div>
+    {% endfor %}
   </div>
+  <p class="legend"><span class="key paid"></span> Paid <span class="key share"></span> Fair share</p>
+</div>
+{% endif %}
 
-  <!-- Chart -->
-  <div class="card">
-    <h2>Spending Breakdown</h2>
-    <canvas id="chart" height="80"></canvas>
-  </div>
-
-  <!-- Payments Table -->
-  <div class="card">
-    <h2>All Payments</h2>
+<div class="card">
+  <h2>Payments</h2>
+  {% if payments %}
+  <div class="table-wrap">
     <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Amount ({{ bill.currency }})</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
+      <thead><tr><th>Paid by</th><th>What for</th><th class="num">Amount ({{ cur }})</th><th></th></tr></thead>
       <tbody>
         {% for p in payments %}
         <tr>
-          <td>{{ p.name }}</td>
-          <td>{{ "%.2f"|format(p.amount) }}</td>
-          <td>
-            <a href="/bill/{{ bill.id }}/edit/{{ p.id }}" class="btn btn-sm btn-outline">Edit</a>
-            <form action="/bill/{{ bill.id }}/delete/{{ p.id }}" method="post" style="display:inline"
+          <td>{{ p.payer }}</td>
+          <td>{{ p.description }}</td>
+          <td class="num">{{ p.cents|money }}</td>
+          <td class="row-actions">
+            <a href="{{ url_for('edit_payment', bill_id=bill.id, payment_id=p.id) }}" class="btn btn-sm btn-outline">Edit</a>
+            <form action="{{ url_for('delete_payment', bill_id=bill.id, payment_id=p.id) }}" method="post" class="inline"
                   onsubmit="return confirm('Remove this payment?')">
               <button class="btn btn-sm btn-danger">Remove</button>
             </form>
@@ -79,62 +164,9 @@
       </tbody>
     </table>
   </div>
-
-  <!-- Settlements -->
-  <div class="card">
-    <h2>Who Pays Whom</h2>
-    {% if transactions %}
-      <ul class="settlement-list">
-        {% for t in transactions %}
-          <li>{{ t }}</li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p class="empty">Everyone is settled ✅</p>
-    {% endif %}
-  </div>
-
-{% else %}
-  <div class="card">
-    <p class="empty">No payments yet — add the first one above.</p>
-  </div>
-{% endif %}
-
-<!-- Safe data bridge: keeps user data out of JS entirely -->
-<div id="payment-data"
-     data-payments='{{ payments | tojson }}'
-     data-currency='{{ bill.currency }}'
-     style="display:none;">
+  {% else %}
+    <p class="empty">No payments yet. Add the first one above.</p>
+  {% endif %}
 </div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script>
-  const el = document.getElementById('payment-data');
-  const payments = JSON.parse(el.dataset.payments);
-  const currency = el.dataset.currency;
-
-  if (payments.length > 0) {
-    const ctx = document.getElementById('chart').getContext('2d');
-    new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: payments.map(p => p.name),
-        datasets: [{
-          label: 'Amount (' + currency + ')',
-          data: payments.map(p => p.amount),
-          backgroundColor: payments.map((_, i) => [
-            '#4CAF50','#2196F3','#FF9800','#9C27B0','#F44336','#00BCD4','#FF5722','#607D8B'
-          ][i % 8]),
-          borderRadius: 6
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true } }
-      }
-    });
-  }
-</script>
 
 {% endblock %}

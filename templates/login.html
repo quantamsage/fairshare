@@ -1,15 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Login{% endblock %}
+{% block title %}Log in{% endblock %}
 {% block content %}
 <div class="auth-card">
   <h1>Welcome back</h1>
-  <form action="/login" method="post">
-    <label>Username</label>
-    <input type="text" name="username" placeholder="Your username" required>
-    <label>Password</label>
-    <input type="password" name="password" placeholder="Your password" required>
-    <button type="submit" class="btn btn-primary btn-full">Log In</button>
+  <form action="{{ url_for('login') }}" method="post">
+    <label for="username">Username</label>
+    <input id="username" type="text" name="username" autocomplete="username" required>
+    <label for="password">Password</label>
+    <input id="password" type="password" name="password" autocomplete="current-password" required>
+    <button type="submit" class="btn btn-primary btn-full">Log in</button>
   </form>
-  <p class="auth-link">No account yet? <a href="/register">Register</a></p>
+  <p class="auth-link">No account yet? <a href="{{ url_for('register') }}">Create one</a></p>
 </div>
 {% endblock %}

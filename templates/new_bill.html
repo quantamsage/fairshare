@@ -1,22 +1,19 @@
 {% extends "base.html" %}
-{% block title %}New Bill{% endblock %}
+{% block title %}New bill{% endblock %}
 {% block content %}
 <div class="auth-card">
-  <h1>New Bill</h1>
-  <form action="/bill/new" method="post">
-    <label>Bill name</label>
-    <input type="text" name="name" placeholder="e.g. Nairobi Trip, Dinner at Java" required>
-    <label>Currency</label>
-    <select name="currency">
-      <option value="KSH">KSH – Kenyan Shilling</option>
-      <option value="USD">USD – US Dollar</option>
-      <option value="EUR">EUR – Euro</option>
-      <option value="GBP">GBP – British Pound</option>
-      <option value="UGX">UGX – Ugandan Shilling</option>
-      <option value="TZS">TZS – Tanzanian Shilling</option>
+  <h1>New bill</h1>
+  <form action="{{ url_for('new_bill') }}" method="post">
+    <label for="name">Bill name</label>
+    <input id="name" type="text" name="name" placeholder="e.g. Naivasha weekend, Dinner at Java" maxlength="100" required>
+    <label for="currency">Currency</label>
+    <select id="currency" name="currency">
+      {% for code, label in currencies.items() %}
+        <option value="{{ code }}">{{ code }} – {{ label }}</option>
+      {% endfor %}
     </select>
-    <button type="submit" class="btn btn-primary btn-full">Create Bill</button>
+    <button type="submit" class="btn btn-primary btn-full">Create bill</button>
   </form>
-  <p class="auth-link"><a href="/">← Back to my bills</a></p>
+  <p class="auth-link"><a href="{{ url_for('index') }}">← Back to my bills</a></p>
 </div>
 {% endblock %}

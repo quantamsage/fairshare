@@ -1,15 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Register{% endblock %}
+{% block title %}Create account{% endblock %}
 {% block content %}
 <div class="auth-card">
-  <h1>Create Account</h1>
-  <form action="/register" method="post">
-    <label>Username</label>
-    <input type="text" name="username" placeholder="Choose a username" required>
-    <label>Password</label>
-    <input type="password" name="password" placeholder="Choose a password" required>
-    <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+  <h1>Create an account</h1>
+  <form action="{{ url_for('register') }}" method="post">
+    <label for="username">Username</label>
+    <input id="username" type="text" name="username" autocomplete="username" maxlength="60" required>
+    <label for="password">Password <span class="hint">(8 or more characters)</span></label>
+    <input id="password" type="password" name="password" autocomplete="new-password" minlength="8" required>
+    <button type="submit" class="btn btn-primary btn-full">Create account</button>
   </form>
-  <p class="auth-link">Already have an account? <a href="/login">Log in</a></p>
+  <p class="auth-link">Already have one? <a href="{{ url_for('login') }}">Log in</a></p>
 </div>
 {% endblock %}

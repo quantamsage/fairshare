@@ -1,15 +1,17 @@
 {% extends "base.html" %}
-{% block title %}Edit Payment{% endblock %}
+{% block title %}Edit payment{% endblock %}
 {% block content %}
 <div class="auth-card">
-  <h1>Edit Payment</h1>
-  <form action="/bill/{{ bill.id }}/edit/{{ payment.id }}" method="post">
-    <label>Name</label>
-    <input type="text" name="name" value="{{ payment.name }}" required>
-    <label>Amount ({{ bill.currency }})</label>
-    <input type="number" name="amount" value="{{ payment.amount }}" min="0.01" step="0.01" required>
-    <button type="submit" class="btn btn-primary btn-full">Save Changes</button>
+  <h1>Edit payment</h1>
+  <form action="{{ url_for('edit_payment', bill_id=bill.id, payment_id=payment.id) }}" method="post">
+    <label for="name">Paid by</label>
+    <input id="name" type="text" name="name" value="{{ payment.name }}" maxlength="60" required>
+    <label for="amount">Amount ({{ bill.currency }})</label>
+    <input id="amount" type="number" name="amount" value="{{ payment.amount }}" min="0.01" step="0.01" required>
+    <label for="description">What for <span class="hint">(optional)</span></label>
+    <input id="description" type="text" name="description" value="{{ payment.description }}" maxlength="120">
+    <button type="submit" class="btn btn-primary btn-full">Save changes</button>
   </form>
-  <p class="auth-link"><a href="/bill/{{ bill.id }}">← Cancel</a></p>
+  <p class="auth-link"><a href="{{ url_for('bill', bill_id=bill.id) }}">← Cancel</a></p>
 </div>
 {% endblock %}
